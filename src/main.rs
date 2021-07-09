@@ -12,7 +12,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
     let mut row_combos = Vec::<Vec<Vec<char>>>::new();
     let mut row_masks = Vec::<Vec<char>>::new();
 
-    let mut combos = Vec::<Vec<char>>::new();
+    let mut combos;
 
     for row in &rows {
         combos = create_combos(&row, cols.len());
@@ -33,7 +33,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
     let mut step = 0;
     while !done_solving {
         done_solving = true;
-        step = step + 1;
+        step += 1;
         println!("step: {}", step);
 
         // combine/validate row/col masks
@@ -41,11 +41,9 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
             for col in 0..cols.len() {
                 if row_masks[row][col] == BOX_UNKNOWN {
                     row_masks[row][col] = col_masks[col][row];
-                }
-                else if col_masks[col][row] == BOX_UNKNOWN {
+                } else if col_masks[col][row] == BOX_UNKNOWN {
                     col_masks[col][row] = row_masks[row][col];
-                }
-                else if row_masks[row][col] != col_masks[col][row] {
+                } else if row_masks[row][col] != col_masks[col][row] {
                     process::exit(1);
                 }
             }
@@ -53,7 +51,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
 
         for row in 0..rows.len() {
             row_combos[row] = filter_with_mask(&row_combos[row], &row_masks[row]);
-            if row_combos[row].len() == 0{
+            if row_combos[row].is_empty() {
                 process::exit(1);
             }
             row_masks[row] = create_mask(&row_combos[row]);
@@ -61,15 +59,15 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
 
         for col in 0..cols.len() {
             col_combos[col] = filter_with_mask(&col_combos[col], &col_masks[col]);
-            if col_combos[col].len() == 0{
+            if col_combos[col].is_empty() {
                 process::exit(1);
             }
             col_masks[col] = create_mask(&col_combos[col]);
         }
 
-        for row in 0..rows.len() {
+        for row_mask in &row_masks {
             let mut line = "".to_string();
-            for ch in &row_masks[row] {
+            for ch in row_mask {
                 if *ch == BOX_UNKNOWN {
                     done_solving = false;
                 }
@@ -77,14 +75,13 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
             }
             println!("{}", line);
         }
-        println!("");
-
+        println!();
     }
 
     println!("Solved in {} steps.", step);
 }
 
-fn create_mask(combos: &Vec<Vec<char>>) -> Vec<char> {
+fn create_mask(combos: &[Vec<char>]) -> Vec<char> {
     let mut mask = Vec::<char>::new();
 
     if let Some((first_combo, remaining_combos)) = combos.split_first() {
@@ -100,10 +97,10 @@ fn create_mask(combos: &Vec<Vec<char>>) -> Vec<char> {
         }
     }
 
-    return mask;
+    mask
 }
 
-fn filter_with_mask(combos : &Vec<Vec<char>>, mask : &Vec<char>) -> Vec<Vec<char>> {
+fn filter_with_mask(combos: &[Vec<char>], mask: &[char]) -> Vec<Vec<char>> {
     let mut new_combos = Vec::<Vec<char>>::new();
     let length = combos[0].len();
 
@@ -111,12 +108,9 @@ fn filter_with_mask(combos : &Vec<Vec<char>>, mask : &Vec<char>) -> Vec<Vec<char
         let mut valid = true;
 
         for ii in 0..length {
-            if mask[ii] != BOX_UNKNOWN {
-                if combo[ii] != mask[ii]
-                {
+            if mask[ii] != BOX_UNKNOWN && combo[ii] != mask[ii] {
                 valid = false;
                 break;
-                }
             }
         }
 
@@ -125,14 +119,14 @@ fn filter_with_mask(combos : &Vec<Vec<char>>, mask : &Vec<char>) -> Vec<Vec<char
         }
     }
 
-    return new_combos
+    new_combos
 }
 
 fn create_combos(chunk_list: &[usize], total_size: usize) -> Vec<Vec<char>> {
     let trailing_spaces;
     let mut combos = Vec::<Vec<char>>::new();
 
-    if chunk_list.len() == 0 {
+    if chunk_list.is_empty() {
         return combos;
     } else if chunk_list.len() > 1 {
         trailing_spaces = 1;
@@ -155,25 +149,17 @@ fn create_combos(chunk_list: &[usize], total_size: usize) -> Vec<Vec<char>> {
         for leading_space in
             0..((total_size - remaining_min_size) - (first_chunk + trailing_spaces) + 1)
         {
-            let mut line = Vec::<char>::new();
+            let mut line;
 
-            for _ in 0..leading_space {
-                line.push(BOX_EMPTY);
-            }
-            for _ in 0..*first_chunk {
-                line.push(BOX_FILLED);
-            }
-            for _ in 0..trailing_spaces {
-                line.push(BOX_EMPTY);
-            }
+            line = vec![BOX_EMPTY; leading_space];
+            line.extend(&vec![BOX_FILLED; *first_chunk]);
+            line.extend(&vec![BOX_EMPTY; trailing_spaces]);
             // println!("line: {:?}", line);
 
             let tail_combos = create_combos(remaining_chunk_list, total_size - line.len());
 
-            if tail_combos.len() == 0 {
-                for _ in 0..(total_size - line.len()) {
-                    line.push(BOX_EMPTY);
-                }
+            if tail_combos.is_empty() {
+                line.extend(&vec![BOX_EMPTY; total_size - line.len()]);
                 combos.push(line);
             } else {
                 for tail in tail_combos {
@@ -191,7 +177,7 @@ fn create_combos(chunk_list: &[usize], total_size: usize) -> Vec<Vec<char>> {
         }
     }
 
-    return combos;
+    combos
 }
 
 #[cfg(test)]
@@ -207,17 +193,17 @@ mod tests {
 }
 
 fn min_size_of_chunk_list(chunk_list: &[usize]) -> usize {
-    if chunk_list.len() == 0 {
+    if chunk_list.is_empty() {
         return 0;
     }
 
     let mut size: usize = 0;
     for chunk in chunk_list {
-        size = size + chunk;
+        size += chunk;
     }
 
     size = size + chunk_list.len() - 1;
-    return size;
+    size
 }
 
 fn simple_test() {
@@ -228,10 +214,10 @@ fn simple_test() {
     }
 
     let mut mask = create_mask(&combos);
-    println!("");
+    println!();
     println!("mask:");
     println!("{:?}", mask);
-    println!("");
+    println!();
 
     mask[0] = BOX_FILLED;
     combos = filter_with_mask(&combos, &mask);
@@ -241,10 +227,10 @@ fn simple_test() {
     }
 
     let mask = create_mask(&combos);
-    println!("");
+    println!();
     println!("mask:");
     println!("{:?}", mask);
-    println!("");
+    println!();
 }
 
 fn main() {
@@ -280,72 +266,72 @@ fn main() {
     // cols.push(vec![7, 3, 1]);
 
     // http://www.nonograms.org/nonograms/i/3541
-    rows.push(vec![9,]);
-    rows.push(vec![16,]);
-    rows.push(vec![3,2,9]);
-    rows.push(vec![2,2,8]);
-    rows.push(vec![2,1,1,8]);
-    rows.push(vec![2,3,3,6]);
-    rows.push(vec![1,3,3,6,2]);
-    rows.push(vec![1,5,4,4,1]);
-    rows.push(vec![1,7,5,4,2]);
-    rows.push(vec![2,23,1]);
-    rows.push(vec![1,2,4,7,4,2]);
-    rows.push(vec![2,2,2,4,3,1]);
-    rows.push(vec![2,2,3,3,1,2,1]);
-    rows.push(vec![2,1,2,2,5]);
-    rows.push(vec![1,1,2,1,1,2]);
-    rows.push(vec![2,1,1,2,1,1,2 ]);
-    rows.push(vec![4,1,1,2,1,1,1]);
-    rows.push(vec![3,2,2,2,1,1]);
-    rows.push(vec![2,4,2,2,2,3,1]);
-    rows.push(vec![1,3,2,1,3,1,1]);
-    rows.push(vec![1,1,1,1,2,2,1,4,2]);
-    rows.push(vec![1,1,1,1,1,1,1,1,4,4]);
-    rows.push(vec![1,1,3,1,1,2,1,1,4,1]);
-    rows.push(vec![3,1,1,2,1,1,1,1,3]);
-    rows.push(vec![3,5,2,2,1,1,2,2,2,1]);
-    rows.push(vec![1,2,3,1,1,1,1,1,1,1,2,2]);
-    rows.push(vec![2,2,4,1,7,1,1,1,3]);
-    rows.push(vec![2,1,2,3,1,3,1]);
-    rows.push(vec![1,2,6,3,5,2,4]);
-    rows.push(vec![3,1,5,1,3,4,1,6]);
+    rows.push(vec![9]);
+    rows.push(vec![16]);
+    rows.push(vec![3, 2, 9]);
+    rows.push(vec![2, 2, 8]);
+    rows.push(vec![2, 1, 1, 8]);
+    rows.push(vec![2, 3, 3, 6]);
+    rows.push(vec![1, 3, 3, 6, 2]);
+    rows.push(vec![1, 5, 4, 4, 1]);
+    rows.push(vec![1, 7, 5, 4, 2]);
+    rows.push(vec![2, 23, 1]);
+    rows.push(vec![1, 2, 4, 7, 4, 2]);
+    rows.push(vec![2, 2, 2, 4, 3, 1]);
+    rows.push(vec![2, 2, 3, 3, 1, 2, 1]);
+    rows.push(vec![2, 1, 2, 2, 5]);
+    rows.push(vec![1, 1, 2, 1, 1, 2]);
+    rows.push(vec![2, 1, 1, 2, 1, 1, 2]);
+    rows.push(vec![4, 1, 1, 2, 1, 1, 1]);
+    rows.push(vec![3, 2, 2, 2, 1, 1]);
+    rows.push(vec![2, 4, 2, 2, 2, 3, 1]);
+    rows.push(vec![1, 3, 2, 1, 3, 1, 1]);
+    rows.push(vec![1, 1, 1, 1, 2, 2, 1, 4, 2]);
+    rows.push(vec![1, 1, 1, 1, 1, 1, 1, 1, 4, 4]);
+    rows.push(vec![1, 1, 3, 1, 1, 2, 1, 1, 4, 1]);
+    rows.push(vec![3, 1, 1, 2, 1, 1, 1, 1, 3]);
+    rows.push(vec![3, 5, 2, 2, 1, 1, 2, 2, 2, 1]);
+    rows.push(vec![1, 2, 3, 1, 1, 1, 1, 1, 1, 1, 2, 2]);
+    rows.push(vec![2, 2, 4, 1, 7, 1, 1, 1, 3]);
+    rows.push(vec![2, 1, 2, 3, 1, 3, 1]);
+    rows.push(vec![1, 2, 6, 3, 5, 2, 4]);
+    rows.push(vec![3, 1, 5, 1, 3, 4, 1, 6]);
 
-    cols.push(vec![4,3,1]);
-    cols.push(vec![2,1,4]);
-    cols.push(vec![1,1,2,1]);
-    cols.push(vec![5,2,1,4]);
-    cols.push(vec![2,3,1,10]);
-    cols.push(vec![2,2,1,2,2]);
-    cols.push(vec![2,4,2,2,1,1]);
-    cols.push(vec![1,6,3,1,2]);
-    cols.push(vec![2,5,2,2,1,3,1]);
-    cols.push(vec![1,6,6,2,1,1,2]);
-    cols.push(vec![2,1,3,3,1,2]);
-    cols.push(vec![2,1,3,3,3,2]);
-    cols.push(vec![2,1,3,3]);
-    cols.push(vec![3,2,3,5]);
-    cols.push(vec![4,1,6,6,2]);
-    cols.push(vec![2,1,1,1,9,1]);
-    cols.push(vec![3,1,1,1,2,2,1,1,1]);
-    cols.push(vec![3,4,4,2]);
-    cols.push(vec![3,1,5,3,4]);
-    cols.push(vec![3,1,6,4,1]);
-    cols.push(vec![3,2,3,4,2,2]);
-    cols.push(vec![4,1,3,4,1,3,1]);
-    cols.push(vec![4,1,2,5,2]);
-    cols.push(vec![4,2,2,5,2]);
-    cols.push(vec![8,1,6]);
-    cols.push(vec![7,2,1]);
-    cols.push(vec![3,4,4,3,2]);
-    cols.push(vec![2,5,1,1,4]);
-    cols.push(vec![2,3,6,5]);
-    cols.push(vec![2,4,1,3,2,3]);
-    cols.push(vec![3,4,3,3,2,1]);
-    cols.push(vec![3,1,1,3,1,2]);
-    cols.push(vec![5,3,2,2]);
-    cols.push(vec![3,2,3,2]);
-    cols.push(vec![1,6,2]);
+    cols.push(vec![4, 3, 1]);
+    cols.push(vec![2, 1, 4]);
+    cols.push(vec![1, 1, 2, 1]);
+    cols.push(vec![5, 2, 1, 4]);
+    cols.push(vec![2, 3, 1, 10]);
+    cols.push(vec![2, 2, 1, 2, 2]);
+    cols.push(vec![2, 4, 2, 2, 1, 1]);
+    cols.push(vec![1, 6, 3, 1, 2]);
+    cols.push(vec![2, 5, 2, 2, 1, 3, 1]);
+    cols.push(vec![1, 6, 6, 2, 1, 1, 2]);
+    cols.push(vec![2, 1, 3, 3, 1, 2]);
+    cols.push(vec![2, 1, 3, 3, 3, 2]);
+    cols.push(vec![2, 1, 3, 3]);
+    cols.push(vec![3, 2, 3, 5]);
+    cols.push(vec![4, 1, 6, 6, 2]);
+    cols.push(vec![2, 1, 1, 1, 9, 1]);
+    cols.push(vec![3, 1, 1, 1, 2, 2, 1, 1, 1]);
+    cols.push(vec![3, 4, 4, 2]);
+    cols.push(vec![3, 1, 5, 3, 4]);
+    cols.push(vec![3, 1, 6, 4, 1]);
+    cols.push(vec![3, 2, 3, 4, 2, 2]);
+    cols.push(vec![4, 1, 3, 4, 1, 3, 1]);
+    cols.push(vec![4, 1, 2, 5, 2]);
+    cols.push(vec![4, 2, 2, 5, 2]);
+    cols.push(vec![8, 1, 6]);
+    cols.push(vec![7, 2, 1]);
+    cols.push(vec![3, 4, 4, 3, 2]);
+    cols.push(vec![2, 5, 1, 1, 4]);
+    cols.push(vec![2, 3, 6, 5]);
+    cols.push(vec![2, 4, 1, 3, 2, 3]);
+    cols.push(vec![3, 4, 3, 3, 2, 1]);
+    cols.push(vec![3, 1, 1, 3, 1, 2]);
+    cols.push(vec![5, 3, 2, 2]);
+    cols.push(vec![3, 2, 3, 2]);
+    cols.push(vec![1, 6, 2]);
 
     solve_puzzle(rows, cols);
 
