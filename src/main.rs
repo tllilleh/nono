@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::process;
 
 const BOX_EMPTY: char = ' ';
@@ -9,25 +10,26 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
     // println!("cols {:?}", cols);
 
     // Initialize rows
-    let mut row_combos = Vec::<Vec<Vec<char>>>::new();
-    let mut row_masks = Vec::<Vec<char>>::new();
-
-    let mut combos;
-
-    for row in &rows {
-        combos = create_combos(&row, cols.len());
-        row_combos.push(combos.clone());
-        row_masks.push(create_mask(&combos));
-    }
+    println!("initializing rows");
+    let (mut row_masks, mut row_combos): (Vec<Vec<char>>, Vec<Vec<Vec<char>>>) = rows
+        .par_iter()
+        .map(|row| {
+            let combos = create_combos(&row, cols.len());
+            (create_mask(&combos), combos)
+        })
+        .unzip();
+    println!("initializing rows: done");
 
     // Initialize cols
-    let mut col_combos = Vec::<Vec<Vec<char>>>::new();
-    let mut col_masks = Vec::<Vec<char>>::new();
-    for col in &cols {
-        combos = create_combos(&col, rows.len());
-        col_combos.push(combos.clone());
-        col_masks.push(create_mask(&combos));
-    }
+    println!("initializing cols");
+    let (mut col_masks, mut col_combos): (Vec<Vec<char>>, Vec<Vec<Vec<char>>>) = cols
+        .par_iter()
+        .map(|col| {
+            let combos = create_combos(&col, rows.len());
+            (create_mask(&combos), combos)
+        })
+        .unzip();
+    println!("initializing cols: done");
 
     let mut done_solving = false;
     let mut step = 0;
@@ -37,6 +39,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
         println!("step: {}", step);
 
         // combine/validate row/col masks
+        println!("combining");
         for row in 0..rows.len() {
             for col in 0..cols.len() {
                 if row_masks[row][col] == BOX_UNKNOWN {
@@ -49,21 +52,44 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
             }
         }
 
-        for row in 0..rows.len() {
-            row_combos[row] = filter_with_mask(&row_combos[row], &row_masks[row]);
-            if row_combos[row].is_empty() {
-                process::exit(1);
-            }
-            row_masks[row] = create_mask(&row_combos[row]);
-        }
+        println!("rows");
+        let (new_row_combos, new_row_masks) = row_combos
+            .par_iter()
+            .zip(row_masks)
+            .map(|(combos, masks)| {
+                let new_row_combos = filter_with_mask(&combos, &masks);
+                if new_row_combos.is_empty() {
+                    process::exit(1);
+                }
+                let new_row_masks = create_mask(&combos);
+                (new_row_combos, new_row_masks)
+            })
+            .unzip();
+        row_combos = new_row_combos;
+        row_masks = new_row_masks;
 
-        for col in 0..cols.len() {
-            col_combos[col] = filter_with_mask(&col_combos[col], &col_masks[col]);
-            if col_combos[col].is_empty() {
-                process::exit(1);
-            }
-            col_masks[col] = create_mask(&col_combos[col]);
-        }
+        println!("cols");
+        // for col in 0..cols.len() {
+        //     col_combos[col] = filter_with_mask(&col_combos[col], &col_masks[col]);
+        //     if col_combos[col].is_empty() {
+        //         process::exit(1);
+        //     }
+        //     col_masks[col] = create_mask(&col_combos[col]);
+        // }
+        let (new_col_combos, new_col_masks) = col_combos
+            .iter()
+            .zip(col_masks)
+            .map(|(combos, masks)| {
+                let new_col_combos = filter_with_mask(&combos, &masks);
+                if new_col_combos.is_empty() {
+                    process::exit(1);
+                }
+                let new_col_masks = create_mask(&combos);
+                (new_col_combos, new_col_masks)
+            })
+            .unzip();
+        col_combos = new_col_combos;
+        col_masks = new_col_masks;
 
         for row_mask in &row_masks {
             let mut line = "".to_string();
