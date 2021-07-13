@@ -1,8 +1,35 @@
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::io;
 use std::process;
+use std::fs::File;
+use std::io::BufReader;
 
-const BOX_EMPTY: char = ' ';
-const BOX_FILLED: char = '█';
+#[derive(Debug, Deserialize)]
+struct Record {
+    sizeCol: usize,
+    sizeRow: usize,
+    title: String,
+    number: i32,
+    solution: String,
+    difficulty: String,
+    colClues: String,
+    rowClues: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct Puzzle {
+    title: String,
+    number: i32,
+    solution: String,
+    difficulty: String,
+    rows: Vec<Vec<usize>>,
+    cols: Vec<Vec<usize>>,
+}
+
+const BOX_EMPTY: char = '█';
+const BOX_FILLED: char = ' ';
 const BOX_UNKNOWN: char = '?';
 
 fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
@@ -32,33 +59,46 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
         step += 1;
         println!("step: {}", step);
 
-        // create masks
-        let mut row_masks: Vec<Vec<char>> = row_combos
-            .par_iter()
-            .map(|combos| create_mask(&combos))
-            .collect();
-
-        let mut col_masks: Vec<Vec<char>> = col_combos
-            .par_iter()
-            .map(|combos| create_mask(&combos))
-            .collect();
-
-        // combine/validate row/col masks
-        for row in 0..rows.len() {
-            for col in 0..cols.len() {
-                if row_masks[row][col] == BOX_UNKNOWN {
-                    row_masks[row][col] = col_masks[col][row];
-                } else if col_masks[col][row] == BOX_UNKNOWN {
-                    col_masks[col][row] = row_masks[row][col];
-                } else if row_masks[row][col] != col_masks[col][row] {
-                    process::exit(1);
-                }
-            }
-        }
+        // Create masks
+        let mut row_masks = Vec::<Vec<char>>::new();
+        let mut col_masks = Vec::<Vec<char>>::new();
 
         rayon::join(
             || {
-                // update rows
+                row_masks = row_combos
+                    .par_iter()
+                    .map(|combos| create_mask(&combos))
+                    .collect();
+            },
+            || {
+                col_masks = col_combos
+                    .par_iter()
+                    .map(|combos| create_mask(&combos))
+                    .collect();
+            },
+        );
+
+        row_masks
+            .iter_mut()
+            .enumerate()
+            .for_each(|(row, row_mask)| {
+                col_masks
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(col, col_mask)| {
+                        if row_mask[col] == BOX_UNKNOWN {
+                            row_mask[col] = col_mask[row];
+                        } else if col_mask[row] == BOX_UNKNOWN {
+                            col_mask[row] = row_mask[col];
+                        } else if row_mask[col] != col_mask[row] {
+                            process::exit(1);
+                        }
+                    });
+            });
+
+        rayon::join(
+            || {
+                // Update rows
                 row_combos = row_combos
                     .par_iter()
                     .zip(&row_masks)
@@ -66,7 +106,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
                     .collect();
             },
             || {
-                // update cols
+                // Update cols
                 col_combos = col_combos
                     .par_iter()
                     .zip(&col_masks)
@@ -75,6 +115,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
             },
         );
 
+        // Show progress
         for row_mask in &row_masks {
             let mut line = "".to_string();
             for ch in row_mask {
@@ -210,134 +251,116 @@ fn min_size_of_chunk_list(chunk_list: &[usize]) -> usize {
     size
 }
 
-fn simple_test() {
-    let mut combos = create_combos(&[1, 2], 5);
-
-    for combo in &combos {
-        println!("{:?}", combo);
-    }
-
-    let mut mask = create_mask(&combos);
-    println!();
-    println!("mask:");
-    println!("{:?}", mask);
-    println!();
-
-    mask[0] = BOX_FILLED;
-    combos = filter_with_mask(&combos, &mask);
-
-    for combo in &combos {
-        println!("{:?}", combo);
-    }
-
-    let mask = create_mask(&combos);
-    println!();
-    println!("mask:");
-    println!("{:?}", mask);
-    println!();
-}
-
 fn main() {
     let mut rows: Vec<Vec<usize>> = Vec::new();
     let mut cols: Vec<Vec<usize>> = Vec::new();
 
-    // Skull
+    // http://www.nonograms.org/nonograms/i/xxx
 
-    // rows.push(vec![3, 3]);
-    // rows.push(vec![2, 2]);
-    // rows.push(vec![2, 2]);
-    // rows.push(vec![2, 2, 2, 2]);
-    // rows.push(vec![2, 2, 2, 2]);
-    // rows.push(vec![3, 1, 3]);
-    // rows.push(vec![1, 2, 2, 1]);
-    // rows.push(vec![5]);
-    // rows.push(vec![2, 1, 2]);
-    // rows.push(vec![4, 4]);
-    // rows.push(vec![2, 1, 2]);
-    // rows.push(vec![5]);
-    // rows.push(vec![1, 7, 1]);
+    // panda on tree
+    //if let Ok(puzzle) = load_from_json(18264) {
 
-    // cols.push(vec![7, 3, 1]);
-    // cols.push(vec![6, 3]);
-    // cols.push(vec![1, 2, 1, 1]);
-    // cols.push(vec![2, 2, 1, 2]);
-    // cols.push(vec![2, 1, 2]);
-    // cols.push(vec![1, 2, 3]);
-    // cols.push(vec![2, 1, 2]);
-    // cols.push(vec![2, 2, 1, 2]);
-    // cols.push(vec![1, 2, 1, 1]);
-    // cols.push(vec![6, 3]);
-    // cols.push(vec![7, 3, 1]);
+    // heron
+    //if let Ok(puzzle) = load_from_json(3541) {
 
-    // http://www.nonograms.org/nonograms/i/3541
-    rows.push(vec![9]);
-    rows.push(vec![16]);
-    rows.push(vec![3, 2, 9]);
-    rows.push(vec![2, 2, 8]);
-    rows.push(vec![2, 1, 1, 8]);
-    rows.push(vec![2, 3, 3, 6]);
-    rows.push(vec![1, 3, 3, 6, 2]);
-    rows.push(vec![1, 5, 4, 4, 1]);
-    rows.push(vec![1, 7, 5, 4, 2]);
-    rows.push(vec![2, 23, 1]);
-    rows.push(vec![1, 2, 4, 7, 4, 2]);
-    rows.push(vec![2, 2, 2, 4, 3, 1]);
-    rows.push(vec![2, 2, 3, 3, 1, 2, 1]);
-    rows.push(vec![2, 1, 2, 2, 5]);
-    rows.push(vec![1, 1, 2, 1, 1, 2]);
-    rows.push(vec![2, 1, 1, 2, 1, 1, 2]);
-    rows.push(vec![4, 1, 1, 2, 1, 1, 1]);
-    rows.push(vec![3, 2, 2, 2, 1, 1]);
-    rows.push(vec![2, 4, 2, 2, 2, 3, 1]);
-    rows.push(vec![1, 3, 2, 1, 3, 1, 1]);
-    rows.push(vec![1, 1, 1, 1, 2, 2, 1, 4, 2]);
-    rows.push(vec![1, 1, 1, 1, 1, 1, 1, 1, 4, 4]);
-    rows.push(vec![1, 1, 3, 1, 1, 2, 1, 1, 4, 1]);
-    rows.push(vec![3, 1, 1, 2, 1, 1, 1, 1, 3]);
-    rows.push(vec![3, 5, 2, 2, 1, 1, 2, 2, 2, 1]);
-    rows.push(vec![1, 2, 3, 1, 1, 1, 1, 1, 1, 1, 2, 2]);
-    rows.push(vec![2, 2, 4, 1, 7, 1, 1, 1, 3]);
-    rows.push(vec![2, 1, 2, 3, 1, 3, 1]);
-    rows.push(vec![1, 2, 6, 3, 5, 2, 4]);
-    rows.push(vec![3, 1, 5, 1, 3, 4, 1, 6]);
+    // dinosaur
+    //if let Ok(puzzle) = load_from_json(4091) {
 
-    cols.push(vec![4, 3, 1]);
-    cols.push(vec![2, 1, 4]);
-    cols.push(vec![1, 1, 2, 1]);
-    cols.push(vec![5, 2, 1, 4]);
-    cols.push(vec![2, 3, 1, 10]);
-    cols.push(vec![2, 2, 1, 2, 2]);
-    cols.push(vec![2, 4, 2, 2, 1, 1]);
-    cols.push(vec![1, 6, 3, 1, 2]);
-    cols.push(vec![2, 5, 2, 2, 1, 3, 1]);
-    cols.push(vec![1, 6, 6, 2, 1, 1, 2]);
-    cols.push(vec![2, 1, 3, 3, 1, 2]);
-    cols.push(vec![2, 1, 3, 3, 3, 2]);
-    cols.push(vec![2, 1, 3, 3]);
-    cols.push(vec![3, 2, 3, 5]);
-    cols.push(vec![4, 1, 6, 6, 2]);
-    cols.push(vec![2, 1, 1, 1, 9, 1]);
-    cols.push(vec![3, 1, 1, 1, 2, 2, 1, 1, 1]);
-    cols.push(vec![3, 4, 4, 2]);
-    cols.push(vec![3, 1, 5, 3, 4]);
-    cols.push(vec![3, 1, 6, 4, 1]);
-    cols.push(vec![3, 2, 3, 4, 2, 2]);
-    cols.push(vec![4, 1, 3, 4, 1, 3, 1]);
-    cols.push(vec![4, 1, 2, 5, 2]);
-    cols.push(vec![4, 2, 2, 5, 2]);
-    cols.push(vec![8, 1, 6]);
-    cols.push(vec![7, 2, 1]);
-    cols.push(vec![3, 4, 4, 3, 2]);
-    cols.push(vec![2, 5, 1, 1, 4]);
-    cols.push(vec![2, 3, 6, 5]);
-    cols.push(vec![2, 4, 1, 3, 2, 3]);
-    cols.push(vec![3, 4, 3, 3, 2, 1]);
-    cols.push(vec![3, 1, 1, 3, 1, 2]);
-    cols.push(vec![5, 3, 2, 2]);
-    cols.push(vec![3, 2, 3, 2]);
-    cols.push(vec![1, 6, 2]);
+    // donkey
+    if let Ok(puzzle) = load_from_json(18274) {
 
-    solve_puzzle(rows, cols);
+        solve_puzzle(puzzle.rows, puzzle.cols);
+    }
 
-    //simple_test();
+    //convert_csv_to_json();
+}
+
+fn load_from_json(number : i32) -> Result<Puzzle, Box<dyn Error>> {
+    // Open the file in read-only mode with buffer.
+    let file = File::open("puzzles.json")?;
+    let reader = BufReader::new(file);
+
+    // Read the JSON contents of the file as an instance of `User`.
+    let puzzles : Vec<Puzzle> = serde_json::from_reader(reader)?;
+
+    // Return the `User`.
+    for puzzle in puzzles {
+        if puzzle.number == number {
+            return Ok(puzzle.clone());
+        }
+    }
+
+    Err("not found".into())
+}
+
+fn convert_csv_to_json() -> Result<(), Box<dyn Error>> {
+    let mut puzzles: Vec<Puzzle> = Vec::new();
+
+    let mut rdr = csv::Reader::from_reader(io::stdin());
+    let results = rdr.deserialize();
+
+    for result in results {
+        let record: Record = result?;
+        //println!("{:?}", record);
+        //println!("{}: {},{}", record.title, record.sizeRow, record.sizeCol);
+        //println!("  size: {},{}", record.sizeRow, record.sizeCol);
+        let mut cols: Vec<Vec<usize>> = Vec::new();
+        let mut rows: Vec<Vec<usize>> = Vec::new();
+
+        let rowClues: Vec<usize> = record
+            .rowClues
+            .split(",")
+            .map(|i| match i.parse() {
+                Ok(num) => num,
+                Err(_) => 0,
+            })
+            .collect();
+        //println!("  row clues: {:?}", rowClues);
+        let mut ii = 0;
+        for _ in 0..record.sizeRow {
+            cols.push(Vec::new());
+        }
+        for num in rowClues {
+            if num != 0 {
+                cols[ii].push(num);
+            }
+            ii = (ii + 1) % record.sizeRow;
+        }
+        //println!("  cols: {:?}", cols);
+
+        let colClues: Vec<usize> = record
+            .colClues
+            .split(",")
+            .map(|i| match i.parse() {
+                Ok(num) => num,
+                Err(_) => 0,
+            })
+            .collect();
+        //println!("  col clues: {:?}", colClues);
+        let clues_per_col = colClues.len() / record.sizeCol;
+        ii = 0;
+        for col in colClues.chunks(clues_per_col) {
+            rows.push(Vec::new());
+            for num in col {
+                if *num != 0 {
+                    rows[ii].push(*num);
+                }
+            }
+            ii += 1;
+        }
+        //println!("  rows: {:?}", rows);
+
+        puzzles.push(Puzzle {
+            title: record.title,
+            number: record.number,
+            solution: record.solution,
+            difficulty: record.difficulty,
+            cols,
+            rows,
+        });
+    }
+
+    println!("{}", serde_json::to_string(&puzzles).unwrap());
+
+    Ok(())
 }
