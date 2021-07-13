@@ -2,7 +2,7 @@ use rayon::prelude::*;
 use std::process;
 
 const BOX_EMPTY: char = ' ';
-const BOX_FILLED: char = 'O';
+const BOX_FILLED: char = '█';
 const BOX_UNKNOWN: char = '?';
 
 fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
@@ -56,19 +56,24 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
             }
         }
 
-        // update rows
-        row_combos = row_combos
-            .par_iter()
-            .zip(&row_masks)
-            .map(|(combos, masks)| filter_with_mask(&combos, &masks))
-            .collect();
-
-        // update cols
-        col_combos = col_combos
-            .par_iter()
-            .zip(&col_masks)
-            .map(|(combos, masks)| filter_with_mask(&combos, &masks))
-            .collect();
+        rayon::join(
+            || {
+                // update rows
+                row_combos = row_combos
+                    .par_iter()
+                    .zip(&row_masks)
+                    .map(|(combos, masks)| filter_with_mask(&combos, &masks))
+                    .collect();
+            },
+            || {
+                // update cols
+                col_combos = col_combos
+                    .par_iter()
+                    .zip(&col_masks)
+                    .map(|(combos, masks)| filter_with_mask(&combos, &masks))
+                    .collect();
+            },
+        );
 
         for row_mask in &row_masks {
             let mut line = "".to_string();
@@ -76,6 +81,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
                 if *ch == BOX_UNKNOWN {
                     done_solving = false;
                 }
+                line.push(*ch);
                 line.push(*ch);
             }
             println!("{}", line);
@@ -106,25 +112,18 @@ fn create_mask(combos: &[Vec<char>]) -> Vec<char> {
 }
 
 fn filter_with_mask(combos: &[Vec<char>], mask: &[char]) -> Vec<Vec<char>> {
-    let mut new_combos = Vec::<Vec<char>>::new();
-    let length = combos[0].len();
-
-    for combo in combos {
-        let mut valid = true;
-
-        for ii in 0..length {
-            if mask[ii] != BOX_UNKNOWN && combo[ii] != mask[ii] {
-                valid = false;
-                break;
+    combos
+        .iter()
+        .filter(|combo| {
+            for (m, c) in mask.iter().zip(combo.iter()) {
+                if *m != BOX_UNKNOWN && c != m {
+                    return false;
+                }
             }
-        }
-
-        if valid {
-            new_combos.push(combo.to_vec());
-        }
-    }
-
-    new_combos
+            true
+        })
+        .cloned()
+        .collect()
 }
 
 fn create_combos(chunk_list: &[usize], total_size: usize) -> Vec<Vec<char>> {
