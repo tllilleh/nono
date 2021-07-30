@@ -1,10 +1,10 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::io;
-use std::process;
 use std::fs::File;
+use std::io;
 use std::io::BufReader;
+use std::process;
 
 #[derive(Debug, Deserialize)]
 struct Record {
@@ -40,7 +40,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
     println!("initializing rows");
     let mut row_combos: Vec<Vec<Vec<char>>> = rows
         .par_iter()
-        .map(|row| create_combos(&row, cols.len()))
+        .map(|row| create_combos(row, cols.len()))
         .collect();
     println!("initializing rows: done");
 
@@ -48,7 +48,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
     println!("initializing cols");
     let mut col_combos: Vec<Vec<Vec<char>>> = cols
         .par_iter()
-        .map(|col| create_combos(&col, rows.len()))
+        .map(|col| create_combos(col, rows.len()))
         .collect();
     println!("initializing cols: done");
 
@@ -67,13 +67,13 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
             || {
                 row_masks = row_combos
                     .par_iter()
-                    .map(|combos| create_mask(&combos))
+                    .map(|combos| create_mask(combos))
                     .collect();
             },
             || {
                 col_masks = col_combos
                     .par_iter()
-                    .map(|combos| create_mask(&combos))
+                    .map(|combos| create_mask(combos))
                     .collect();
             },
         );
@@ -102,7 +102,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
                 row_combos = row_combos
                     .par_iter()
                     .zip(&row_masks)
-                    .map(|(combos, masks)| filter_with_mask(&combos, &masks))
+                    .map(|(combos, masks)| filter_with_mask(combos, masks))
                     .collect();
             },
             || {
@@ -110,7 +110,7 @@ fn solve_puzzle(rows: Vec<Vec<usize>>, cols: Vec<Vec<usize>>) {
                 col_combos = col_combos
                     .par_iter()
                     .zip(&col_masks)
-                    .map(|(combos, masks)| filter_with_mask(&combos, &masks))
+                    .map(|(combos, masks)| filter_with_mask(combos, masks))
                     .collect();
             },
         );
@@ -179,7 +179,7 @@ fn create_combos(chunk_list: &[usize], total_size: usize) -> Vec<Vec<char>> {
         trailing_spaces = 0;
     }
 
-    let min_size = min_size_of_chunk_list(&chunk_list);
+    let min_size = min_size_of_chunk_list(chunk_list);
 
     if min_size > total_size {
         return combos;
@@ -252,41 +252,31 @@ fn min_size_of_chunk_list(chunk_list: &[usize]) -> usize {
 }
 
 fn main() {
-    let mut rows: Vec<Vec<usize>> = Vec::new();
-    let mut cols: Vec<Vec<usize>> = Vec::new();
-
     // http://www.nonograms.org/nonograms/i/xxx
 
-    // panda on tree
-    //if let Ok(puzzle) = load_from_json(18264) {
-
-    // heron
-    //if let Ok(puzzle) = load_from_json(3541) {
-
-    // dinosaur
-    //if let Ok(puzzle) = load_from_json(4091) {
-
-    // donkey
-    if let Ok(puzzle) = load_from_json(18274) {
-
+    // panda on tree: 18264
+    // heron: 3541
+    // dinasaur: 4091
+    // donkey: 18274
+    if let Ok(puzzle) = load_from_json(18264) {
         solve_puzzle(puzzle.rows, puzzle.cols);
     }
 
     //convert_csv_to_json();
 }
 
-fn load_from_json(number : i32) -> Result<Puzzle, Box<dyn Error>> {
+fn load_from_json(number: i32) -> Result<Puzzle, Box<dyn Error>> {
     // Open the file in read-only mode with buffer.
     let file = File::open("puzzles.json")?;
     let reader = BufReader::new(file);
 
     // Read the JSON contents of the file as an instance of `User`.
-    let puzzles : Vec<Puzzle> = serde_json::from_reader(reader)?;
+    let puzzles: Vec<Puzzle> = serde_json::from_reader(reader)?;
 
     // Return the `User`.
     for puzzle in puzzles {
         if puzzle.number == number {
-            return Ok(puzzle.clone());
+            return Ok(puzzle);
         }
     }
 
@@ -309,11 +299,8 @@ fn convert_csv_to_json() -> Result<(), Box<dyn Error>> {
 
         let rowClues: Vec<usize> = record
             .rowClues
-            .split(",")
-            .map(|i| match i.parse() {
-                Ok(num) => num,
-                Err(_) => 0,
-            })
+            .split(',')
+            .map(|i| i.parse().unwrap_or(0))
             .collect();
         //println!("  row clues: {:?}", rowClues);
         let mut ii = 0;
@@ -330,11 +317,8 @@ fn convert_csv_to_json() -> Result<(), Box<dyn Error>> {
 
         let colClues: Vec<usize> = record
             .colClues
-            .split(",")
-            .map(|i| match i.parse() {
-                Ok(num) => num,
-                Err(_) => 0,
-            })
+            .split(',')
+            .map(|i| i.parse().unwrap_or(0))
             .collect();
         //println!("  col clues: {:?}", colClues);
         let clues_per_col = colClues.len() / record.sizeCol;
