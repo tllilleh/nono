@@ -2,21 +2,8 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
-use std::io;
 use std::io::BufReader;
 use std::process;
-
-#[derive(Debug, Deserialize)]
-struct Record {
-    sizeCol: usize,
-    sizeRow: usize,
-    title: String,
-    number: i32,
-    solution: String,
-    difficulty: String,
-    colClues: String,
-    rowClues: String,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 struct Puzzle {
@@ -261,8 +248,6 @@ fn main() {
     if let Ok(puzzle) = load_from_json(18264) {
         solve_puzzle(puzzle.rows, puzzle.cols);
     }
-
-    //convert_csv_to_json();
 }
 
 fn load_from_json(number: i32) -> Result<Puzzle, Box<dyn Error>> {
@@ -281,70 +266,4 @@ fn load_from_json(number: i32) -> Result<Puzzle, Box<dyn Error>> {
     }
 
     Err("not found".into())
-}
-
-fn convert_csv_to_json() -> Result<(), Box<dyn Error>> {
-    let mut puzzles: Vec<Puzzle> = Vec::new();
-
-    let mut rdr = csv::Reader::from_reader(io::stdin());
-    let results = rdr.deserialize();
-
-    for result in results {
-        let record: Record = result?;
-        //println!("{:?}", record);
-        //println!("{}: {},{}", record.title, record.sizeRow, record.sizeCol);
-        //println!("  size: {},{}", record.sizeRow, record.sizeCol);
-        let mut cols: Vec<Vec<usize>> = Vec::new();
-        let mut rows: Vec<Vec<usize>> = Vec::new();
-
-        let rowClues: Vec<usize> = record
-            .rowClues
-            .split(',')
-            .map(|i| i.parse().unwrap_or(0))
-            .collect();
-        //println!("  row clues: {:?}", rowClues);
-        let mut ii = 0;
-        for _ in 0..record.sizeRow {
-            cols.push(Vec::new());
-        }
-        for num in rowClues {
-            if num != 0 {
-                cols[ii].push(num);
-            }
-            ii = (ii + 1) % record.sizeRow;
-        }
-        //println!("  cols: {:?}", cols);
-
-        let colClues: Vec<usize> = record
-            .colClues
-            .split(',')
-            .map(|i| i.parse().unwrap_or(0))
-            .collect();
-        //println!("  col clues: {:?}", colClues);
-        let clues_per_col = colClues.len() / record.sizeCol;
-        ii = 0;
-        for col in colClues.chunks(clues_per_col) {
-            rows.push(Vec::new());
-            for num in col {
-                if *num != 0 {
-                    rows[ii].push(*num);
-                }
-            }
-            ii += 1;
-        }
-        //println!("  rows: {:?}", rows);
-
-        puzzles.push(Puzzle {
-            title: record.title,
-            number: record.number,
-            solution: record.solution,
-            difficulty: record.difficulty,
-            cols,
-            rows,
-        });
-    }
-
-    println!("{}", serde_json::to_string(&puzzles).unwrap());
-
-    Ok(())
 }
